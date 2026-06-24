@@ -1,0 +1,139 @@
+# daily_pipeline.py
+import requests
+import random
+from datetime import datetime
+
+API_URL = "http://127.0.0.1:8000"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. SIMULADOR DE API DE FUTEBOL (Substituir por API-Football no futuro)
+# ══════════════════════════════════════════════════════════════════════════════
+def get_today_fixtures():
+    """
+    Retorna os jogos do dia. 
+    No futuro, aqui você colocará: requests.get("https://v3.football.api-sports.io/fixtures?date=YYYY-MM-DD")
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Simulando 5 jogos de ligas variadas com perfis táticos diferentes
+    fixtures = [
+        {"home": "Mushuc Runa", "away": "LDU Quito", "league": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
+        {"home": "Barcelona SC", "away": "Emelec", "league": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
+        {"home": "Ind. del Valle", "away": "Aucas", "league": "Liga Pro", "home_str": 0.9, "away_str": 0.5},
+        {"home": "Deportivo Cuenca", "away": "Delfin", "league": "Liga Pro", "home_str": 0.55, "away_str": 0.55},
+        {"home": "El Nacional", "away": "Guayaquil City", "league": "Liga Pro", "home_str": 0.4, "away_str": 0.45},
+    ]
+    
+    for f in fixtures:
+        f["date"] = today
+    return fixtures
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. ESTIMADOR DE PRÉ-JOGO (Converte Força do Time nas 60 Features)
+# ══════════════════════════════════════════════════════════════════════════════
+def estimate_prematch_features(fixture: dict) -> dict:
+    """
+    Pega a 'força' relativa dos times e gera um dicionário realista 
+    com as médias esperadas para as 60 features da v44.
+    """
+    hs = fixture["home_str"] # Força casa (0 a 1)
+    as_ = fixture["away_str"] # Força fora (0 a 1)
+    
+    # Geração estatística baseada em desvios padrão da Liga Pro
+    rng = random.Random(hash(fixture["home"] + fixture["away"]))
+    
+    # xG esperado baseado na força
+    xg_h = max(0.4, 1.3 * hs + rng.uniform(-0.3, 0.3))
+    xg_a = max(0.3, 1.1 * as_ + rng.uniform(-0.3, 0.3))
+    
+    # Odds de mercado (simulando o overround da casa de apostas)
+    p_h = (xg_h / (xg_h + xg_a + 0.8)) * 0.95
+    p_a = (xg_a / (xg_h + xg_a + 0.8)) * 0.95
+    p_d = 1.0 - p_h - p_a
+    oh = round(1 / p_h + 0.05, 2)
+    od = round(1 / p_d + 0.06, 2)
+    oa = round(1 / p_a + 0.05, 2)
+
+    return {
+        "date": fixture["date"],
+        "home_team": fixture["home"],
+        "away_team": fixture["away"],
+        "competition": fixture["league"],
+        "matchday": 15,
+        "xg_home": round(xg_h, 2), "xg_away": round(xg_a, 2),
+        "shots_home": int(12 * hs + rng.randint(-2, 2)), 
+        "shots_away": int(10 * as_ + rng.randint(-2, 2)),
+        "shots_on_home": int(5 * hs + rng.randint(-1, 1)), 
+        "shots_on_away": int(4 * as_ + rng.randint(-1, 1)),
+        "possession_home": round(50 + 12 * (hs - as_) + rng.uniform(-3, 3), 1),
+        "possession_away": round(50 - 12 * (hs - as_) + rng.uniform(-3, 3), 1),
+        "pass_acc_home": round(75 + 5 * hs + rng.uniform(-2, 2), 1),
+        "pass_acc_away": round(73 + 5 * as_ + rng.uniform(-2, 2), 1),
+        "tackles_home": int(18 * (1-as_) + rng.randint(-3, 3)),
+        "tackles_away": int(18 * (1-hs) + rng.randint(-3, 3)),
+        "interceptions_home": int(10 * (1-as_) + rng.randint(-2, 2)),
+        "interceptions_away": int(10 * (1-hs) + rng.randint(-2, 2)),
+        "ppda_home": round(10 - 3 * hs + rng.uniform(-1, 1), 1),
+        "ppda_away": round(10 - 3 * as_ + rng.uniform(-1, 1), 1),
+        "corners_home": int(6 * hs + rng.randint(-1, 2)),
+        "corners_away": int(5 * as_ + rng.randint(-1, 2)),
+        "aerial_won_home": round(50 + rng.uniform(-5, 5), 1),
+        "aerial_won_away": round(50 + rng.uniform(-5, 5), 1),
+        "key_passes_home": int(8 * hs + rng.randint(-1, 2)),
+        "key_passes_away": int(7 * as_ + rng.randint(-1, 2)),
+        "prog_passes_home": int(25 * hs + rng.randint(-3, 3)),
+        "prog_passes_away": int(23 * as_ + rng.randint(-3, 3)),
+        "touches_box_home": int(14 * hs + rng.randint(-2, 2)),
+        "touches_box_away": int(11 * as_ + rng.randint(-2, 2)),
+        "rest_days_home": rng.choice([3, 4, 7]),
+        "rest_days_away": rng.choice([3, 4, 7]),
+        "altitude_home_m": rng.choice([0, 0, 2577, 2812]),
+        "home_league_pos": rng.randint(1, 16),
+        "away_league_pos": rng.randint(1, 16),
+        "home_pts": rng.randint(5, 35),
+        "away_pts": rng.randint(5, 35),
+        "home_gf_season": rng.randint(10, 40),
+        "home_ga_season": rng.randint(10, 40),
+        "away_gf_season": rng.randint(10, 40),
+        "away_ga_season": rng.randint(10, 40),
+        "odds_home": oh, "odds_draw": od, "odds_away": oa
+    }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. GERADOR DE PALPITES (Rankeia pelo CLV/Edge)
+# ══════════════════════════════════════════════════════════════════════════════
+def generate_daily_tips():
+    """Busca jogos, estima features, passa na IA e ranqueia os melhores."""
+    fixtures = get_today_fixtures()
+    tips = []
+    
+    for fix in fixtures:
+        try:
+            # 1. Estima as 60 features de pré-jogo
+            features = estimate_prematch_features(fix)
+            
+            # 2. Chama a API FastAPI
+            response = requests.post(f"{API_URL}/predict", json=features)
+            if response.status_code == 200:
+                res = response.json()
+                
+                # 3. Calcula o "Score" do palpite (Maior CLV = Maior Valor Real)
+                max_clv = max(res["clv"].values())
+                
+                tips.append({
+                    "match": f"{fix['home']} vs {fix['away']}",
+                    "league": fix["league"],
+                    "recommendation": res["recommendation"],
+                    "confidence": res["confidence"],
+                    "probs": res["probs"],
+                    "kelly": res["kelly"],
+                    "clv": res["clv"],
+                    "max_clv": max_clv,
+                    "odds": {"home": features["odds_home"], "draw": features["odds_draw"], "away": features["odds_away"]}
+                })
+        except Exception as e:
+            print(f"Erro ao processar {fix['home']} vs {fix['away']}: {e}")
+            
+    # Ordena do maior Edge (CLV) para o menor
+    tips.sort(key=lambda x: x["max_clv"], reverse=True)
+    return tips

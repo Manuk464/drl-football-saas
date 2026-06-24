@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.pyo
+v44_database.db
+.env
