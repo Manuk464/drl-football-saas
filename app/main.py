@@ -123,9 +123,9 @@ class InferenceEngine:
     def _load_model(self):
         if os.path.exists(self.model_path):
             self.agent.load(self.model_path)
-            print(f"✅ Modelo v44 carregado de {self.model_path}")
+            print(f"Modelo v44 carregado de {self.model_path}")
         else:
-            print(f"⚠️ Modelo não encontrado em {self.model_path}. Usando pesos aleatórios.")
+            print(f"Modelo nao encontrado em {self.model_path}. Usando pesos aleatorios.")
 
     def predict(self, data: dict) -> dict:
         parsed_data = self._parse_input(data)
@@ -186,7 +186,7 @@ class InferenceEngine:
         }
 
 # ==============================================================================
-# 5. FASTAPI APP & CORS LIBERADO PARA A NUvem
+# 5. FASTAPI APP
 # ==============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -197,15 +197,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DRL Football API v44", version="4.4.0", lifespan=lifespan)
 
-# 🔥 CORS LIBERADO PARA STREAMLIT CLOUD E LOCALHOST 🔥
+# CORS liberado para Streamlit Cloud
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://*.streamlit.app", 
-        "https://*.streamlit.io", 
-        "http://localhost:8501",
-        "http://localhost:3000"
-    ],
+    allow_origins=["*"],
     allow_origin_regex=r"https://.*\.streamlit\.app",
     allow_credentials=True,
     allow_methods=["*"],
@@ -321,7 +316,7 @@ def root():
     return {"message": "API DRL v44 Online!"}
 
 # ==============================================================================
-# 8. ROTAS DE TRANSPARÊNCIA (BACKTEST) E DADOS REAIS
+# 8. ROTA DE BACKTEST (Transparência)
 # ==============================================================================
 @app.get("/backtest")
 async def get_backtest_stats():
@@ -376,14 +371,3 @@ async def get_backtest_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/real-fixtures")
-async def get_real_fixtures():
-    return {
-        "status": "ready_for_integration",
-        "message": "Endpoint preparado. Insira sua API Key da API-Football para buscar jogos reais.",
-        "sample_fixture": {
-            "home": "Flamengo", "away": "Palmeiras",
-            "league": "Brasileirao", "odds_home": 2.10, "odds_draw": 3.20, "odds_away": 3.50
-        }
-    }
