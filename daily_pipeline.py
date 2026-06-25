@@ -1,21 +1,35 @@
 # daily_pipeline.py
 import requests
-import random
 from datetime import datetime
+from football_api import get_real_fixtures_for_today, get_fixtures_by_date
+import os
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. SIMULADOR DE API DE FUTEBOL (Substituir por API-Football no futuro)
-# ══════════════════════════════════════════════════════════════════════════════
 def get_today_fixtures():
     """
-    Retorna os jogos do dia. 
-    No futuro, aqui você colocará: requests.get("https://v3.football.api-sports.io/fixtures?date=YYYY-MM-DD")
+    Retorna os jogos do dia.
+    Se FOOTBALL_API_KEY estiver configurada, busca dados reais.
+    Caso contrário, usa dados simulados.
     """
+    api_key = os.environ.get("FOOTBALL_API_KEY", "")
+    
+    if api_key:
+        try:
+            print("Buscando jogos reais da API-Football...")
+            real_fixtures = get_real_fixtures_for_today()
+            if real_fixtures:
+                print(f"Encontrados {len(real_fixtures)} jogos reais")
+                return real_fixtures
+            else:
+                print("Nenhum jogo real encontrado, usando dados simulados")
+        except Exception as e:
+            print(f"Erro ao buscar jogos reais: {e}")
+            print("Usando dados simulados como fallback")
+    
+    # Fallback: dados simulados (código original)
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # Simulando 5 jogos de ligas variadas com perfis táticos diferentes
     fixtures = [
         {"home": "Mushuc Runa", "away": "LDU Quito", "league": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
         {"home": "Barcelona SC", "away": "Emelec", "league": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
@@ -26,27 +40,28 @@ def get_today_fixtures():
     
     for f in fixtures:
         f["date"] = today
+    
     return fixtures
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. ESTIMADOR DE PRÉ-JOGO (Converte Força do Time nas 60 Features)
-# ══════════════════════════════════════════════════════════════════════════════
 def estimate_prematch_features(fixture: dict) -> dict:
     """
-    Pega a 'força' relativa dos times e gera um dicionário realista 
-    com as médias esperadas para as 60 features da v44.
+    Se o fixture já vem formatado (da API real), retorna diretamente.
+    Caso contrário, estima as features baseado na força dos times.
     """
-    hs = fixture["home_str"] # Força casa (0 a 1)
-    as_ = fixture["away_str"] # Força fora (0 a 1)
+    # Se já tem todas as features necessárias, retorna diretamente
+    if "xg_home" in fixture and "odds_home" in fixture:
+        return fixture
     
-    # Geração estatística baseada em desvios padrão da Liga Pro
-    rng = random.Random(hash(fixture["home"] + fixture["away"]))
+    # Caso contrário, estima (código original)
+    import random
+    hs = fixture.get("home_str", 0.5)
+    as_ = fixture.get("away_str", 0.5)
     
-    # xG esperado baseado na força
+    rng = random.Random(hash(fixture.get("home", "") + fixture.get("away", "")))
+    
     xg_h = max(0.4, 1.3 * hs + rng.uniform(-0.3, 0.3))
     xg_a = max(0.3, 1.1 * as_ + rng.uniform(-0.3, 0.3))
     
-    # Odds de mercado (simulando o overround da casa de apostas)
     p_h = (xg_h / (xg_h + xg_a + 0.8)) * 0.95
     p_a = (xg_a / (xg_h + xg_a + 0.8)) * 0.95
     p_d = 1.0 - p_h - p_a
@@ -55,10 +70,10 @@ def estimate_prematch_features(fixture: dict) -> dict:
     oa = round(1 / p_a + 0.05, 2)
 
     return {
-        "date": fixture["date"],
-        "home_team": fixture["home"],
-        "away_team": fixture["away"],
-        "competition": fixture["league"],
+        "date": fixture.get("date", datetime.now().strftime("%Y-%m-%d")),
+        "home_team": fixture.get("home", "Unknown"),
+        "away_team": fixture.get("away", "Unknown"),
+        "competition": fixture.get("league", "Unknown"),
         "matchday": 15,
         "xg_home": round(xg_h, 2), "xg_away": round(xg_a, 2),
         "shots_home": int(12 * hs + rng.randint(-2, 2)), 
@@ -99,9 +114,6 @@ def estimate_prematch_features(fixture: dict) -> dict:
         "odds_home": oh, "odds_draw": od, "odds_away": oa
     }
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. GERADOR DE PALPITES (Rankeia pelo CLV/Edge)
-# ══════════════════════════════════════════════════════════════════════════════
 def generate_daily_tips():
     """Busca jogos, estima features, passa na IA e ranqueia os melhores."""
     fixtures = get_today_fixtures()
@@ -109,31 +121,31 @@ def generate_daily_tips():
     
     for fix in fixtures:
         try:
-            # 1. Estima as 60 features de pré-jogo
             features = estimate_prematch_features(fix)
             
-            # 2. Chama a API FastAPI
-            response = requests.post(f"{API_URL}/predict", json=features)
+            response = requests.post(f"{API_URL}/predict", json=features, timeout=5)
             if response.status_code == 200:
                 res = response.json()
                 
-                # 3. Calcula o "Score" do palpite (Maior CLV = Maior Valor Real)
                 max_clv = max(res["clv"].values())
                 
                 tips.append({
-                    "match": f"{fix['home']} vs {fix['away']}",
-                    "league": fix["league"],
+                    "match": f"{fix.get('home_team', fix.get('home', 'Unknown'))} vs {fix.get('away_team', fix.get('away', 'Unknown'))}",
+                    "league": fix.get("competition", fix.get("league", "Unknown")),
                     "recommendation": res["recommendation"],
                     "confidence": res["confidence"],
                     "probs": res["probs"],
                     "kelly": res["kelly"],
                     "clv": res["clv"],
                     "max_clv": max_clv,
-                    "odds": {"home": features["odds_home"], "draw": features["odds_draw"], "away": features["odds_away"]}
+                    "odds": {
+                        "home": features.get("odds_home", 2.5),
+                        "draw": features.get("odds_draw", 3.2),
+                        "away": features.get("odds_away", 2.8)
+                    }
                 })
         except Exception as e:
-            print(f"Erro ao processar {fix['home']} vs {fix['away']}: {e}")
+            print(f"Erro ao processar {fix}: {e}")
             
-    # Ordena do maior Edge (CLV) para o menor
     tips.sort(key=lambda x: x["max_clv"], reverse=True)
     return tips
