@@ -5,10 +5,8 @@ from typing import List, Dict, Optional
 import time
 from dotenv import load_dotenv
 
-# Carrega as variáveis do arquivo .env
 load_dotenv()
 
-# Configurações da API
 API_KEY = os.environ.get("FOOTBALL_API_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 
