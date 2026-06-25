@@ -1,17 +1,13 @@
-# daily_pipeline.py
 import requests
 from datetime import datetime
 from football_api import get_real_fixtures_for_today, get_fixtures_by_date
 import os
+import random
 
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 def get_today_fixtures():
-    """
-    Retorna os jogos do dia.
-    Se FOOTBALL_API_KEY estiver configurada, busca dados reais.
-    Caso contrário, usa dados simulados.
-    """
+    """Retorna os jogos do dia"""
     api_key = os.environ.get("FOOTBALL_API_KEY", "")
     
     if api_key:
@@ -27,9 +23,8 @@ def get_today_fixtures():
             print(f"Erro ao buscar jogos reais: {e}")
             print("Usando dados simulados como fallback")
     
-    # Fallback: dados simulados (código original)
+    # Fallback: dados simulados
     today = datetime.now().strftime("%Y-%m-%d")
-    
     fixtures = [
         {"home": "Mushuc Runa", "away": "LDU Quito", "league": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
         {"home": "Barcelona SC", "away": "Emelec", "league": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
@@ -44,16 +39,10 @@ def get_today_fixtures():
     return fixtures
 
 def estimate_prematch_features(fixture: dict) -> dict:
-    """
-    Se o fixture já vem formatado (da API real), retorna diretamente.
-    Caso contrário, estima as features baseado na força dos times.
-    """
-    # Se já tem todas as features necessárias, retorna diretamente
+    """Estima features baseadas na força dos times"""
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
     
-    # Caso contrário, estima (código original)
-    import random
     hs = fixture.get("home_str", 0.5)
     as_ = fixture.get("away_str", 0.5)
     
@@ -65,9 +54,10 @@ def estimate_prematch_features(fixture: dict) -> dict:
     p_h = (xg_h / (xg_h + xg_a + 0.8)) * 0.95
     p_a = (xg_a / (xg_h + xg_a + 0.8)) * 0.95
     p_d = 1.0 - p_h - p_a
-    oh = round(1 / p_h + 0.05, 2)
-    od = round(1 / p_d + 0.06, 2)
-    oa = round(1 / p_a + 0.05, 2)
+    
+    oh = round(1 / p_h + 0.05, 2) if p_h > 0 else 2.5
+    od = round(1 / p_d + 0.06, 2) if p_d > 0 else 3.2
+    oa = round(1 / p_a + 0.05, 2) if p_a > 0 else 2.8
 
     return {
         "date": fixture.get("date", datetime.now().strftime("%Y-%m-%d")),
@@ -115,20 +105,17 @@ def estimate_prematch_features(fixture: dict) -> dict:
     }
 
 def generate_daily_tips():
-    """Busca jogos, estima features, passa na IA e ranqueia os melhores."""
+    """Gera palpites do dia"""
     fixtures = get_today_fixtures()
     tips = []
     
     for fix in fixtures:
         try:
             features = estimate_prematch_features(fix)
-            
             response = requests.post(f"{API_URL}/predict", json=features, timeout=5)
             if response.status_code == 200:
                 res = response.json()
-                
                 max_clv = max(res["clv"].values())
-                
                 tips.append({
                     "match": f"{fix.get('home_team', fix.get('home', 'Unknown'))} vs {fix.get('away_team', fix.get('away', 'Unknown'))}",
                     "league": fix.get("competition", fix.get("league", "Unknown")),
@@ -146,7 +133,6 @@ def generate_daily_tips():
                 })
         except Exception as e:
             print(f"Erro ao processar {fix}: {e}")
-            
+    
     tips.sort(key=lambda x: x["max_clv"], reverse=True)
     return tips
-# Updated: 06/25/2026 11:27:03
