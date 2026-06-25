@@ -219,3 +219,4 @@ def map_fixture_to_model_format(fixture: Dict, statistics: Dict, odds: Dict, sta
                 mapped_data["away_pts"] = team.get("points", 20)
                 all_matches = team.get("all", {})
                 mapped_data["away_gf_season"] = all
+# Updated: 06/25/2026 11:27:02
