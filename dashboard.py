@@ -10,8 +10,7 @@ API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 def api_request_with_retry(method, url, **kwargs):
     """Faz requisição com retry para lidar com servidor "dormindo" no Render"""
-    timeout = kwargs.pop('timeout', 30)  # Aumenta timeout padrão para 30s
-    
+    timeout = kwargs.pop('timeout', 30)
     for attempt in range(3):
         try:
             if method == "GET":
@@ -104,7 +103,7 @@ def dashboard():
     
     st.sidebar.markdown("---")
     
-    menu_options = ["🏆 Palpites do Dia", " Transparencia & ROI"]
+    menu_options = ["🏆 Palpites do Dia", "📊 Transparencia & ROI"]
     if is_vip:
         menu_options += ["🔮 Analise Manual", "💰 Simulador de Banca", "📜 Historico"]
     
@@ -115,7 +114,7 @@ def dashboard():
         limit = 3 if is_vip else 1
         st.caption(f"Exibindo Top {limit} palpites. {'(VIP)' if is_vip else '(FREE - Upgrade para ver todos)'}")
         
-        if st.button(" Buscar Jogos de Hoje", type="primary"):
+        if st.button("🔄 Buscar Jogos de Hoje", type="primary"):
             from daily_pipeline import get_today_fixtures, estimate_prematch_features
             
             with st.status("Processando...", expanded=True) as status:
@@ -124,14 +123,14 @@ def dashboard():
                 st.write(f"Analisando {len(fixtures)} jogos...")
                 
                 for i, fix in enumerate(fixtures):
-                    st.write(f"  {fix['home']} vs {fix['away']} ({i+1}/{len(fixtures)})")
+                    st.write(f"  {fix['home_team']} vs {fix['away_team']} ({i+1}/{len(fixtures)})")
                     features = estimate_prematch_features(fix)
                     try:
                         resp = api_request_with_retry("POST", f"{API_URL}/predict", json=features)
                         if resp.status_code == 200:
                             res = resp.json()
                             tips.append({
-                                "match": f"{fix['home']} vs {fix['away']}",
+                                "match": f"{fix['home_team']} vs {fix['away_team']}",
                                 "rec": res["recommendation"],
                                 "conf": res["confidence"],
                                 "probs": res["probs"],
@@ -141,7 +140,7 @@ def dashboard():
                                 "odds": {"home": features["odds_home"], "draw": features["odds_draw"], "away": features["odds_away"]}
                             })
                     except Exception as e:
-                        st.error(f"Erro ao processar {fix['home']}: {e}")
+                        st.error(f"Erro ao processar {fix['home_team']}: {e}")
                 
                 status.update(label="Concluido!", state="complete", expanded=False)
                 st.session_state['tips'] = sorted(tips, key=lambda x: x["max_clv"], reverse=True)[:limit]
@@ -163,7 +162,7 @@ def dashboard():
                 st.info("💡 Voce esta vendo apenas o Top 1. Faca upgrade para VIP e veja o Top 3 completo + Simulador de Banca!")
 
     elif menu == "📊 Transparencia & ROI":
-        st.title(" Auditoria e Transparencia do Modelo DRL")
+        st.title("📊 Auditoria e Transparencia do Modelo DRL")
         st.markdown("Aqui voce ve o **historico real** da IA rodando sobre partidas passadas. Sem promessas, apenas matematica e backtesting.")
         
         if st.button("🔄 Rodar Backtesting (Historico CSV)", type="primary"):
@@ -201,7 +200,7 @@ def dashboard():
             st.plotly_chart(fig, use_container_width=True)
             
             if not is_vip:
-                st.success(" **Gostou dos resultados?** Faca upgrade para o plano VIP agora!")
+                st.success("🔥 **Gostou dos resultados?** Faca upgrade para o plano VIP agora!")
 
     elif menu == "🔮 Analise Manual":
         st.title("🔮 Analise Manual")

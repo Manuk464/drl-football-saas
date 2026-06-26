@@ -110,7 +110,6 @@ def generate_daily_tips():
     """Gera palpites do dia"""
     fixtures = get_today_fixtures()
     tips = []
-    
     for fix in fixtures:
         try:
             features = estimate_prematch_features(fix)
