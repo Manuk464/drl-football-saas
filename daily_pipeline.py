@@ -7,23 +7,24 @@ import random
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 def get_today_fixtures():
-    """Retorna os jogos do dia"""
+    print("[INFO] get_today_fixtures() chamado")
     api_key = os.environ.get("FOOTBALL_API_KEY", "")
+    
+    print(f"[DEBUG] API_KEY no daily_pipeline: {'CONFIGURADA' if api_key else 'NÃO CONFIGURADA'}")
     
     if api_key:
         try:
-            print("Buscando jogos reais da API-Football...")
+            print("[INFO] Tentando buscar jogos reais...")
             real_fixtures = get_real_fixtures_for_today()
             if real_fixtures:
-                print(f"Encontrados {len(real_fixtures)} jogos reais")
+                print(f"[SUCCESS] {len(real_fixtures)} jogos reais encontrados!")
                 return real_fixtures
             else:
-                print("Nenhum jogo real encontrado, usando dados simulados")
+                print("[AVISO] Nenhum jogo real retornado")
         except Exception as e:
-            print(f"Erro ao buscar jogos reais: {e}")
-            print("Usando dados simulados como fallback")
+            print(f"[ERRO] Falha ao buscar jogos reais: {str(e)}")
     
-    # Fallback: dados simulados
+    print("[INFO] Usando dados simulados como fallback")
     today = datetime.now().strftime("%Y-%m-%d")
     fixtures = [
         {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
@@ -37,8 +38,6 @@ def get_today_fixtures():
     return fixtures
 
 def estimate_prematch_features(fixture: dict) -> dict:
-    """Estima features baseadas na força dos times"""
-    # Se já tem todas as features necessárias (dados reais), retorna diretamente
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
     
@@ -107,7 +106,6 @@ def estimate_prematch_features(fixture: dict) -> dict:
     }
 
 def generate_daily_tips():
-    """Gera palpites do dia"""
     fixtures = get_today_fixtures()
     tips = []
     for fix in fixtures:
