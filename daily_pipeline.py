@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime
-from football_api import get_real_fixtures_for_today, get_fixtures_by_date
+from football_api import get_real_fixtures_for_today
 import os
 import random
 
@@ -26,11 +26,9 @@ def get_today_fixtures():
     # Fallback: dados simulados
     today = datetime.now().strftime("%Y-%m-%d")
     fixtures = [
-        {"home": "Mushuc Runa", "away": "LDU Quito", "league": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
-        {"home": "Barcelona SC", "away": "Emelec", "league": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
-        {"home": "Ind. del Valle", "away": "Aucas", "league": "Liga Pro", "home_str": 0.9, "away_str": 0.5},
-        {"home": "Deportivo Cuenca", "away": "Delfin", "league": "Liga Pro", "home_str": 0.55, "away_str": 0.55},
-        {"home": "El Nacional", "away": "Guayaquil City", "league": "Liga Pro", "home_str": 0.4, "away_str": 0.45},
+        {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
+        {"home_team": "Barcelona SC", "away_team": "Emelec", "competition": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
+        {"home_team": "Ind. del Valle", "away_team": "Aucas", "competition": "Liga Pro", "home_str": 0.9, "away_str": 0.5},
     ]
     
     for f in fixtures:
@@ -40,13 +38,14 @@ def get_today_fixtures():
 
 def estimate_prematch_features(fixture: dict) -> dict:
     """Estima features baseadas na força dos times"""
+    # Se já tem todas as features necessárias (dados reais), retorna diretamente
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
     
     hs = fixture.get("home_str", 0.5)
     as_ = fixture.get("away_str", 0.5)
     
-    rng = random.Random(hash(fixture.get("home", "") + fixture.get("away", "")))
+    rng = random.Random(hash(fixture.get("home_team", "") + fixture.get("away_team", "")))
     
     xg_h = max(0.4, 1.3 * hs + rng.uniform(-0.3, 0.3))
     xg_a = max(0.3, 1.1 * as_ + rng.uniform(-0.3, 0.3))
@@ -61,23 +60,24 @@ def estimate_prematch_features(fixture: dict) -> dict:
 
     return {
         "date": fixture.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "home_team": fixture.get("home", "Unknown"),
-        "away_team": fixture.get("away", "Unknown"),
-        "competition": fixture.get("league", "Unknown"),
+        "home_team": fixture.get("home_team", "Unknown"),
+        "away_team": fixture.get("away_team", "Unknown"),
+        "competition": fixture.get("competition", "Unknown"),
         "matchday": 15,
-        "xg_home": round(xg_h, 2), "xg_away": round(xg_a, 2),
-        "shots_home": int(12 * hs + rng.randint(-2, 2)), 
+        "xg_home": round(xg_h, 2),
+        "xg_away": round(xg_a, 2),
+        "shots_home": int(12 * hs + rng.randint(-2, 2)),
         "shots_away": int(10 * as_ + rng.randint(-2, 2)),
-        "shots_on_home": int(5 * hs + rng.randint(-1, 1)), 
+        "shots_on_home": int(5 * hs + rng.randint(-1, 1)),
         "shots_on_away": int(4 * as_ + rng.randint(-1, 1)),
         "possession_home": round(50 + 12 * (hs - as_) + rng.uniform(-3, 3), 1),
         "possession_away": round(50 - 12 * (hs - as_) + rng.uniform(-3, 3), 1),
         "pass_acc_home": round(75 + 5 * hs + rng.uniform(-2, 2), 1),
         "pass_acc_away": round(73 + 5 * as_ + rng.uniform(-2, 2), 1),
-        "tackles_home": int(18 * (1-as_) + rng.randint(-3, 3)),
-        "tackles_away": int(18 * (1-hs) + rng.randint(-3, 3)),
-        "interceptions_home": int(10 * (1-as_) + rng.randint(-2, 2)),
-        "interceptions_away": int(10 * (1-hs) + rng.randint(-2, 2)),
+        "tackles_home": int(18 * (1 - as_) + rng.randint(-3, 3)),
+        "tackles_away": int(18 * (1 - hs) + rng.randint(-3, 3)),
+        "interceptions_home": int(10 * (1 - as_) + rng.randint(-2, 2)),
+        "interceptions_away": int(10 * (1 - hs) + rng.randint(-2, 2)),
         "ppda_home": round(10 - 3 * hs + rng.uniform(-1, 1), 1),
         "ppda_away": round(10 - 3 * as_ + rng.uniform(-1, 1), 1),
         "corners_home": int(6 * hs + rng.randint(-1, 2)),
@@ -101,7 +101,9 @@ def estimate_prematch_features(fixture: dict) -> dict:
         "home_ga_season": rng.randint(10, 40),
         "away_gf_season": rng.randint(10, 40),
         "away_ga_season": rng.randint(10, 40),
-        "odds_home": oh, "odds_draw": od, "odds_away": oa
+        "odds_home": oh,
+        "odds_draw": od,
+        "odds_away": oa
     }
 
 def generate_daily_tips():
@@ -117,8 +119,8 @@ def generate_daily_tips():
                 res = response.json()
                 max_clv = max(res["clv"].values())
                 tips.append({
-                    "match": f"{fix.get('home_team', fix.get('home', 'Unknown'))} vs {fix.get('away_team', fix.get('away', 'Unknown'))}",
-                    "league": fix.get("competition", fix.get("league", "Unknown")),
+                    "match": f"{fix.get('home_team', 'Unknown')} vs {fix.get('away_team', 'Unknown')}",
+                    "league": fix.get("competition", "Unknown"),
                     "recommendation": res["recommendation"],
                     "confidence": res["confidence"],
                     "probs": res["probs"],
