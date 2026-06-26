@@ -99,7 +99,6 @@ def get_real_fixtures_for_today() -> List[Dict]:
         
         fixtures = get_fixtures_by_date(today)
         
-        # Filtra apenas jogos que ainda não começaram
         valid_fixtures = [f for f in fixtures if f.get("fixture", {}).get("status", {}).get("short", "") in ["NS", "1H", "2H", "HT"]]
         
         print(f"[INFO] Jogos válidos encontrados: {len(valid_fixtures)}")
