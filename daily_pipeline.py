@@ -8,21 +8,18 @@ API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 def get_today_fixtures():
     print("[INFO] get_today_fixtures() chamado")
-    api_key = os.environ.get("FOOTBALL_API_KEY", "")
     
-    print(f"[DEBUG] API_KEY: {'CONFIGURADA' if api_key else 'NÃO CONFIGURADA'}")
-    
-    if api_key:
-        try:
-            print("[INFO] Buscando jogos reais...")
-            real_fixtures = get_real_fixtures_for_today()
-            if real_fixtures:
-                print(f"[SUCCESS] {len(real_fixtures)} jogos reais!")
-                return real_fixtures
-            else:
-                print("[AVISO] Nenhum jogo real")
-        except Exception as e:
-            print(f"[ERRO] Falha: {e}")
+    # Tenta buscar jogos reais
+    try:
+        print("[INFO] Buscando jogos reais...")
+        real_fixtures = get_real_fixtures_for_today()
+        if real_fixtures and len(real_fixtures) > 0:
+            print(f"[SUCCESS] {len(real_fixtures)} jogos reais encontrados!")
+            return real_fixtures
+        else:
+            print("[AVISO] Nenhum jogo real retornado")
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar jogos reais: {e}")
     
     print("[INFO] Usando fallback")
     today = datetime.now().strftime("%Y-%m-%d")
