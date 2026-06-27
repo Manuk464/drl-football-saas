@@ -18,9 +18,11 @@ def get_today_fixtures():
 def estimate_prematch_features(fixture):
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
+    
     hs = fixture.get("home_str", 0.5)
     as_ = fixture.get("away_str", 0.5)
     rng = random.Random(hash(fixture.get("home_team", "") + fixture.get("away_team", "")))
+    
     xg_h = max(0.4, 1.3 * hs + rng.uniform(-0.3, 0.3))
     xg_a = max(0.3, 1.1 * as_ + rng.uniform(-0.3, 0.3))
     p_h = (xg_h / (xg_h + xg_a + 0.8)) * 0.95
@@ -29,6 +31,7 @@ def estimate_prematch_features(fixture):
     oh = round(1 / p_h + 0.05, 2) if p_h > 0 else 2.5
     od = round(1 / p_d + 0.06, 2) if p_d > 0 else 3.2
     oa = round(1 / p_a + 0.05, 2) if p_a > 0 else 2.8
+
     return {
         "date": fixture.get("date", datetime.now().strftime("%Y-%m-%d")),
         "home_team": fixture.get("home_team", "Unknown"),

@@ -14,8 +14,10 @@ def _get(endpoint, params=None):
     key = f"{endpoint}:{str(params)}"
     if key in _cache and time.time() - _cache_ts[key] < CACHE_DUR:
         return _cache[key]
+    
     headers = {"x-apisports-key": API_KEY}
     r = requests.get(f"{BASE_URL}/{endpoint}", headers=headers, params=params, timeout=15)
+    
     if r.status_code == 200:
         _cache[key] = r.json()
         _cache_ts[key] = time.time()
@@ -54,15 +56,21 @@ def get_real_fixtures_for_today():
     today = datetime.now().strftime("%Y-%m-%d")
     data = _get("fixtures", {"date": today})
     fixtures = data.get("response", [])
+    
     valid = [f for f in fixtures if f.get("fixture", {}).get("status", {}).get("short", "") in ["NS", "1H", "2H", "HT", "P"]]
+    
     results = []
     for fixture in valid[:3]:
         try:
             fid = fixture.get("fixture", {}).get("id")
+            
+            # Estatísticas
             stats_data = _get("fixtures/statistics", {"fixture": fid}).get("response", [])
             home_stats = stats_data[0].get("statistics", []) if len(stats_data) > 0 else []
             away_stats = stats_data[1].get("statistics", []) if len(stats_data) > 1 else []
             time.sleep(2)
+            
+            # Odds
             odds_data = _get("odds", {"fixture": fid}).get("response", [])
             odds = {"home": 2.5, "draw": 3.2, "away": 2.8}
             if odds_data:
@@ -77,16 +85,20 @@ def get_real_fixtures_for_today():
                                 elif val.get("value") == "Away":
                                     odds["away"] = float(val.get("odd", 2.8))
             time.sleep(2)
+            
+            # Nomes REAIS (SEM ESPAÇOS!)
             teams = fixture.get("fixture", {}).get("teams", {})
             league = fixture.get("league", {})
             home_name = teams.get("home", {}).get("name", "Unknown")
             away_name = teams.get("away", {}).get("name", "Unknown")
             league_name = league.get("name", "Unknown")
+            
             round_str = league.get("round", "")
             try:
                 matchday = int("".join(filter(str.isdigit, round_str)) or 15)
             except:
                 matchday = 15
+            
             results.append({
                 "date": fixture.get("fixture", {}).get("date", "")[:10],
                 "home_team": home_name,
@@ -138,6 +150,7 @@ def get_real_fixtures_for_today():
         except Exception as e:
             print(f"[ERRO] {e}")
             continue
+    
     return results
 
 def _get_mock_fixtures():
@@ -145,4 +158,5 @@ def _get_mock_fixtures():
     return [
         {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8, "date": today},
         {"home_team": "Barcelona SC", "away_team": "Emelec", "competition": "Liga Pro", "home_str": 0.85, "away_str": 0.65, "date": today},
+        {"home_team": "Ind. del Valle", "away_team": "Aucas", "competition": "Liga Pro", "home_str": 0.9, "away_str": 0.5, "date": today},
     ]

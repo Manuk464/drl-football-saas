@@ -35,6 +35,7 @@ def login_page():
     st.markdown("### Acesse sua conta para ver os palpites da IA")
     st.markdown("---")
     tab1, tab2 = st.tabs(["🔑 Entrar", "📝 Criar Conta"])
+    
     with tab1:
         st.subheader("Login")
         username = st.text_input("Utilizador", key="login_user")
@@ -53,6 +54,7 @@ def login_page():
                     st.error(resp.json().get("detail", "Erro no login."))
             except Exception as e:
                 st.error(f"Erro de conexão: {e}")
+    
     with tab2:
         st.subheader("Criar Conta Grátis")
         new_user = st.text_input("Utilizador", key="reg_user")
@@ -72,11 +74,14 @@ def dashboard():
     username = st.session_state.get('username', 'User')
     plan = st.session_state.get('plan', 'free')
     is_vip = plan == "vip"
+    
     st.sidebar.markdown(f"### Olá, **{username}**")
     st.sidebar.markdown(f"Plano: **{'⭐ VIP' if is_vip else '🆓 FREE'}**")
+    
     if st.sidebar.button("Sair"):
         st.session_state.clear()
         st.rerun()
+    
     if not is_vip:
         st.sidebar.warning("Está no plano FREE. Faça upgrade para ver todos os palpites!")
         if st.sidebar.button("⭐ Fazer Upgrade para VIP"):
@@ -88,6 +93,7 @@ def dashboard():
                     st.rerun()
             except:
                 st.error("Erro ao fazer upgrade.")
+    
     st.sidebar.markdown("---")
     menu_options = ["🏆 Palpites do Dia", "📊 Transparência & ROI"]
     if is_vip:
@@ -98,17 +104,20 @@ def dashboard():
         st.title("🏆 Palpites do Dia")
         limit = 3 if is_vip else 1
         st.caption(f"Top {limit} palpites. {'(VIP)' if is_vip else '(FREE - Upgrade para ver todos)'}")
+        
         if st.button("🔄 Buscar Jogos de Hoje", type="primary"):
             from daily_pipeline import get_today_fixtures, estimate_prematch_features
             with st.status("Processando jogos reais...", expanded=True) as status:
                 tips = []
                 fixtures = get_today_fixtures()
                 st.write(f"📊 Analisando {len(fixtures)} jogos...")
+                
                 for i, fix in enumerate(fixtures):
                     home = fix.get('home_team', fix.get('home', 'Unknown'))
                     away = fix.get('away_team', fix.get('away', 'Unknown'))
                     league = fix.get('competition', fix.get('league', ''))
                     st.write(f"⚽ **{home}** vs **{away}** ({league})")
+                    
                     features = estimate_prematch_features(fix)
                     try:
                         resp = api_request_with_retry("POST", f"{API_URL}/predict", json=features)
@@ -131,12 +140,15 @@ def dashboard():
                             })
                     except Exception as e:
                         st.error(f"Erro ao processar {home}: {e}")
+                
                 status.update(label=f"✅ {len(tips)} palpites gerados!", state="complete", expanded=False)
                 st.session_state['tips'] = sorted(tips, key=lambda x: x["max_clv"], reverse=True)[:limit]
+        
         if 'tips' in st.session_state:
             for i, tip in enumerate(st.session_state['tips']):
                 st.markdown(f"### {i+1}. {tip['match']}")
                 st.caption(f"🏆 {tip['league']}")
+                
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     st.metric("🎯 Ação", tip['rec'])
@@ -147,6 +159,7 @@ def dashboard():
                 with c4:
                     odd_media = (tip['odds']['home'] + tip['odds']['draw'] + tip['odds']['away']) / 3
                     st.metric("💰 Odd Média", f"{odd_media:.2f}")
+                
                 st.caption(
                     f"📊 **Probabilidades IA:** "
                     f"Casa {tip['probs']['home']:.1%} | "
@@ -160,12 +173,14 @@ def dashboard():
                     f"Fora {tip['odds']['away']:.2f}"
                 )
                 st.markdown("---")
+            
             if not is_vip:
                 st.info("💡 Está a ver apenas o Top 1. Faça upgrade VIP para ver Top 3 + Simulador de Banca!")
 
     elif menu == "📊 Transparência & ROI":
         st.title("📊 Auditoria e Transparência do Modelo DRL")
         st.markdown("**Histórico real** da IA sobre partidas passadas. Apenas matemática e backtesting.")
+        
         if st.button("🔄 Rodar Backtesting", type="primary"):
             with st.spinner("Processando histórico..."):
                 try:
@@ -176,6 +191,7 @@ def dashboard():
                         st.error("Erro ao buscar backtest.")
                 except Exception as e:
                     st.error(f"Erro de conexão: {e}")
+        
         if 'backtest' in st.session_state:
             bt = st.session_state['backtest']
             c1, c2, c3, c4 = st.columns(4)
@@ -191,6 +207,7 @@ def dashboard():
             with c4:
                 st.metric("💵 Banca Final", f"R$ {bt['final_bank']}")
                 st.metric("🎲 Total Apostas", bt['total_bets'])
+            
             st.markdown("---")
             st.subheader("📈 Curva de Capital (Equity Curve)")
             fig = go.Figure()
@@ -206,6 +223,7 @@ def dashboard():
                 template="plotly_dark"
             )
             st.plotly_chart(fig, use_container_width=True)
+            
             if not is_vip:
                 st.success("🔥 **Gostou dos resultados?** Faça upgrade para o plano VIP!")
 
@@ -227,6 +245,7 @@ def dashboard():
                 "away_gf_season": 10, "away_ga_season": 13,
                 "odds_home": 2.75, "odds_draw": 3.25, "odds_away": 2.60
             }
+        
         if 'match_data' in st.session_state:
             if st.button("Executar DRL", type="primary"):
                 try:
@@ -235,6 +254,7 @@ def dashboard():
                         st.session_state['result'] = resp.json()
                 except Exception as e:
                     st.error(f"Erro: {e}")
+            
             if 'result' in st.session_state:
                 r = st.session_state['result']
                 st.metric("🎯 Ação", r['recommendation'])
