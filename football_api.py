@@ -64,13 +64,11 @@ def get_real_fixtures_for_today():
         try:
             fid = fixture.get("fixture", {}).get("id")
             
-            # Estatísticas
             stats_data = _get("fixtures/statistics", {"fixture": fid}).get("response", [])
             home_stats = stats_data[0].get("statistics", []) if len(stats_data) > 0 else []
             away_stats = stats_data[1].get("statistics", []) if len(stats_data) > 1 else []
             time.sleep(2)
             
-            # Odds
             odds_data = _get("odds", {"fixture": fid}).get("response", [])
             odds = {"home": 2.5, "draw": 3.2, "away": 2.8}
             if odds_data:
@@ -86,7 +84,6 @@ def get_real_fixtures_for_today():
                                     odds["away"] = float(val.get("odd", 2.8))
             time.sleep(2)
             
-            # Nomes REAIS (SEM ESPAÇOS!)
             teams = fixture.get("fixture", {}).get("teams", {})
             league = fixture.get("league", {})
             home_name = teams.get("home", {}).get("name", "Unknown")

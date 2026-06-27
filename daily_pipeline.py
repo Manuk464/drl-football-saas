@@ -31,7 +31,7 @@ def estimate_prematch_features(fixture):
     oh = round(1 / p_h + 0.05, 2) if p_h > 0 else 2.5
     od = round(1 / p_d + 0.06, 2) if p_d > 0 else 3.2
     oa = round(1 / p_a + 0.05, 2) if p_a > 0 else 2.8
-
+    
     return {
         "date": fixture.get("date", datetime.now().strftime("%Y-%m-%d")),
         "home_team": fixture.get("home_team", "Unknown"),

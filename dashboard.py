@@ -113,9 +113,9 @@ def dashboard():
                 st.write(f"📊 Analisando {len(fixtures)} jogos...")
                 
                 for i, fix in enumerate(fixtures):
-                    home = fix.get('home_team', fix.get('home', 'Unknown'))
-                    away = fix.get('away_team', fix.get('away', 'Unknown'))
-                    league = fix.get('competition', fix.get('league', ''))
+                    home = fix.get("home_team", fix.get("home", "Unknown"))
+                    away = fix.get("away_team", fix.get("away", "Unknown"))
+                    league = fix.get("competition", fix.get("league", ""))
                     st.write(f"⚽ **{home}** vs **{away}** ({league})")
                     
                     features = estimate_prematch_features(fix)
