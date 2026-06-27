@@ -3,14 +3,12 @@ import os
 from datetime import datetime
 from typing import List, Dict
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
 
 API_KEY = os.environ.get("FOOTBALL_API_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 
-print(f"[DEBUG] API_KEY: {'CONFIGURADA' if API_KEY else 'NÃO CONFIGURADA'}")
+print(f"[DEBUG] API_KEY length: {len(API_KEY)}")
+print(f"[DEBUG] API_KEY configurada: {'SIM' if API_KEY else 'NÃO'}")
 
 _cache = {}
 _cache_ts = {}
