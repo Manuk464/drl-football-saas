@@ -1,55 +1,39 @@
 import requests
 from datetime import datetime
-from football_api import get_real_fixtures_for_today
+from football_api import get_real_fixtures_for_today, _get_mock_fixtures
 import os
 import random
 
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
+
 def get_today_fixtures():
-    print("[INFO] get_today_fixtures() chamado")
-    
-    # Tenta buscar jogos reais
+    """Retorna jogos reais da API ou fallback simulado"""
     try:
-        print("[INFO] Buscando jogos reais...")
         real_fixtures = get_real_fixtures_for_today()
         if real_fixtures and len(real_fixtures) > 0:
-            print(f"[SUCCESS] {len(real_fixtures)} jogos reais encontrados!")
+            print(f"[SUCCESS] {len(real_fixtures)} jogos reais!")
             return real_fixtures
-        else:
-            print("[AVISO] Nenhum jogo real retornado")
     except Exception as e:
         print(f"[ERRO] Falha ao buscar jogos reais: {e}")
-    
-    print("[INFO] Usando fallback")
-    today = datetime.now().strftime("%Y-%m-%d")
-    fixtures = [
-        {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
-        {"home_team": "Barcelona SC", "away_team": "Emelec", "competition": "Liga Pro", "home_str": 0.85, "away_str": 0.65},
-        {"home_team": "Ind. del Valle", "away_team": "Aucas", "competition": "Liga Pro", "home_str": 0.9, "away_str": 0.5},
-    ]
-    
-    for f in fixtures:
-        f["date"] = today
-    
-    return fixtures
+    return _get_mock_fixtures()
+
 
 def estimate_prematch_features(fixture):
+    """Retorna as features para o modelo DRL. Se já vierem completas (dados reais), retorna direto."""
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
-    
+
+    # Fallback: estima features baseado na força dos times
     hs = fixture.get("home_str", 0.5)
     as_ = fixture.get("away_str", 0.5)
-    
     rng = random.Random(hash(fixture.get("home_team", "") + fixture.get("away_team", "")))
-    
+
     xg_h = max(0.4, 1.3 * hs + rng.uniform(-0.3, 0.3))
     xg_a = max(0.3, 1.1 * as_ + rng.uniform(-0.3, 0.3))
-    
     p_h = (xg_h / (xg_h + xg_a + 0.8)) * 0.95
     p_a = (xg_a / (xg_h + xg_a + 0.8)) * 0.95
     p_d = 1.0 - p_h - p_a
-    
     oh = round(1 / p_h + 0.05, 2) if p_h > 0 else 2.5
     od = round(1 / p_d + 0.06, 2) if p_d > 0 else 3.2
     oa = round(1 / p_a + 0.05, 2) if p_a > 0 else 2.8
@@ -101,34 +85,3 @@ def estimate_prematch_features(fixture):
         "odds_draw": od,
         "odds_away": oa
     }
-
-def generate_daily_tips():
-    fixtures = get_today_fixtures()
-    tips = []
-    for fix in fixtures:
-        try:
-            features = estimate_prematch_features(fix)
-            response = requests.post(f"{API_URL}/predict", json=features, timeout=5)
-            if response.status_code == 200:
-                res = response.json()
-                max_clv = max(res["clv"].values())
-                tips.append({
-                    "match": f"{fix.get('home_team', 'Unknown')} vs {fix.get('away_team', 'Unknown')}",
-                    "league": fix.get("competition", "Unknown"),
-                    "recommendation": res["recommendation"],
-                    "confidence": res["confidence"],
-                    "probs": res["probs"],
-                    "kelly": res["kelly"],
-                    "clv": res["clv"],
-                    "max_clv": max_clv,
-                    "odds": {
-                        "home": features.get("odds_home", 2.5),
-                        "draw": features.get("odds_draw", 3.2),
-                        "away": features.get("odds_away", 2.8)
-                    }
-                })
-        except Exception as e:
-            print(f"Erro: {e}")
-    
-    tips.sort(key=lambda x: x["max_clv"], reverse=True)
-    return tips

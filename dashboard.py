@@ -8,8 +8,9 @@ import time
 st.set_page_config(page_title="DRL Football AI v44", page_icon="🧠", layout="wide")
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
+
 def api_request_with_retry(method, url, **kwargs):
-    """Faz requisição com retry para lidar com servidor 'dormindo' no Render"""
+    """Requisição com retry para lidar com o 'sono' do Render Free"""
     timeout = kwargs.pop('timeout', 30)
     for attempt in range(3):
         try:
@@ -31,17 +32,17 @@ def api_request_with_retry(method, url, **kwargs):
             else:
                 raise
 
+
 def login_page():
     st.title("🧠 DRL Football AI")
     st.markdown("### Acesse sua conta para ver os palpites da IA")
     st.markdown("---")
     tab1, tab2 = st.tabs(["🔑 Entrar", "📝 Criar Conta"])
-    
+
     with tab1:
         st.subheader("Login")
-        username = st.text_input("Usuario", key="login_user")
+        username = st.text_input("Utilizador", key="login_user")
         password = st.text_input("Senha", type="password", key="login_pass")
-        
         if st.button("Entrar", type="primary"):
             try:
                 resp = api_request_with_retry("POST", f"{API_URL}/login", json={
@@ -57,77 +58,75 @@ def login_page():
                 else:
                     st.error(resp.json().get("detail", "Erro no login."))
             except Exception as e:
-                st.error(f"Erro de conexao: {e}")
-    
+                st.error(f"Erro de conexão: {e}")
+
     with tab2:
-        st.subheader("Criar Conta Gratis")
-        new_user = st.text_input("Usuario", key="reg_user")
+        st.subheader("Criar Conta Grátis")
+        new_user = st.text_input("Utilizador", key="reg_user")
         new_email = st.text_input("Email", key="reg_email")
         new_pass = st.text_input("Senha", type="password", key="reg_pass")
-        
         if st.button("Criar Conta", type="primary"):
             try:
                 resp = api_request_with_retry("POST", f"{API_URL}/register", json={
                     "username": new_user, "email": new_email, "password": new_pass
                 })
                 if resp.status_code == 200:
-                    st.success("Conta criada! Faca login na aba ao lado.")
+                    st.success("Conta criada! Faça login na aba ao lado.")
                 else:
                     st.error(resp.json().get("detail", "Erro ao criar conta."))
             except Exception as e:
-                st.error(f"Erro de conexao: {e}")
+                st.error(f"Erro de conexão: {e}")
+
 
 def dashboard():
     username = st.session_state.get('username', 'User')
     plan = st.session_state.get('plan', 'free')
     is_vip = plan == "vip"
-    
-    st.sidebar.markdown(f"### Ola, **{username}**")
+
+    st.sidebar.markdown(f"### Olá, **{username}**")
     st.sidebar.markdown(f"Plano: **{'⭐ VIP' if is_vip else '🆓 FREE'}**")
-    
+
     if st.sidebar.button("Sair"):
         st.session_state.clear()
         st.rerun()
-    
+
     if not is_vip:
-        st.sidebar.warning("Voce esta no plano FREE. Faca upgrade para ver todos os palpites!")
+        st.sidebar.warning("Está no plano FREE. Faça upgrade para ver todos os palpites!")
         if st.sidebar.button("⭐ Fazer Upgrade para VIP"):
             try:
                 resp = api_request_with_retry("POST", f"{API_URL}/upgrade/{username}")
                 if resp.status_code == 200:
                     st.session_state['plan'] = "vip"
-                    st.success("Upgrade realizado! Voce agora e VIP!")
+                    st.success("Upgrade realizado! Agora é VIP!")
                     st.rerun()
             except:
                 st.error("Erro ao fazer upgrade.")
-    
+
     st.sidebar.markdown("---")
-    
-    menu_options = ["🏆 Palpites do Dia", "📊 Transparencia & ROI"]
+    menu_options = ["🏆 Palpites do Dia", "📊 Transparência & ROI"]
     if is_vip:
-        menu_options += ["🔮 Analise Manual", "💰 Simulador de Banca", "📜 Historico"]
-    
+        menu_options += ["🔮 Análise Manual", "💰 Simulador de Banca", "📜 Histórico"]
     menu = st.sidebar.selectbox("Menu", menu_options)
 
     if menu == "🏆 Palpites do Dia":
         st.title("🏆 Palpites do Dia")
         limit = 3 if is_vip else 1
-        st.caption(f"Exibindo Top {limit} palpites. {'(VIP)' if is_vip else '(FREE - Upgrade para ver todos)'}")
-        
+        st.caption(f"Top {limit} palpites. {'(VIP)' if is_vip else '(FREE - Upgrade para ver todos)'}")
+
         if st.button("🔄 Buscar Jogos de Hoje", type="primary"):
             from daily_pipeline import get_today_fixtures, estimate_prematch_features
-            
-            with st.status("Processando...", expanded=True) as status:
+            with st.status("Processando jogos reais...", expanded=True) as status:
                 tips = []
                 fixtures = get_today_fixtures()
-                st.write(f"Analisando {len(fixtures)} jogos...")
-                
+                st.write(f"📊 Analisando {len(fixtures)} jogos...")
+
                 for i, fix in enumerate(fixtures):
-                    # Suporta tanto chaves 'home_team' (API real) quanto 'home' (mock)
+                    # Suporta chaves 'home_team' (API real) e 'home' (fallback)
                     home = fix.get('home_team', fix.get('home', 'Unknown'))
                     away = fix.get('away_team', fix.get('away', 'Unknown'))
-                    st.write(f"  ⚽ {home} vs {away} ({i+1}/{len(fixtures)})")
-                    
+                    league = fix.get('competition', fix.get('league', ''))
+                    st.write(f"⚽ **{home}** vs **{away}** ({league})")
+
                     features = estimate_prematch_features(fix)
                     try:
                         resp = api_request_with_retry("POST", f"{API_URL}/predict", json=features)
@@ -135,7 +134,7 @@ def dashboard():
                             res = resp.json()
                             tips.append({
                                 "match": f"{home} vs {away}",
-                                "league": fix.get('competition', fix.get('league', 'Unknown')),
+                                "league": league,
                                 "rec": res["recommendation"],
                                 "conf": res["confidence"],
                                 "probs": res["probs"],
@@ -150,40 +149,49 @@ def dashboard():
                             })
                     except Exception as e:
                         st.error(f"Erro ao processar {home}: {e}")
-                
-                status.update(label="Concluido!", state="complete", expanded=False)
+
+                status.update(label=f"✅ {len(tips)} palpites gerados!", state="complete", expanded=False)
                 st.session_state['tips'] = sorted(tips, key=lambda x: x["max_clv"], reverse=True)[:limit]
-        
+
         if 'tips' in st.session_state:
             for i, tip in enumerate(st.session_state['tips']):
                 st.markdown(f"### {i+1}. {tip['match']}")
-                
-                if 'league' in tip:
-                    st.caption(f"🏆 {tip['league']}")
-                
+                st.caption(f"🏆 {tip['league']}")
+
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    st.metric("Acao", tip['rec'])
+                    st.metric("🎯 Ação", tip['rec'])
                 with c2:
-                    st.metric("Edge (CLV)", f"{tip['max_clv']:+.2%}")
+                    st.metric("📈 Edge (CLV)", f"{tip['max_clv']:+.2%}")
                 with c3:
-                    st.metric("Confianca", tip['conf'])
+                    st.metric("🎲 Confiança", tip['conf'])
                 with c4:
-                    st.metric("Odd Media", f"{(tip['odds']['home'] + tip['odds']['draw'] + tip['odds']['away']) / 3:.2f}")
-                
-                st.caption(f"Probabilidades: Casa {tip['probs']['home']:.1%} | Empate {tip['probs']['draw']:.1%} | Fora {tip['probs']['away']:.1%}")
-                st.caption(f"Odds de Mercado: Casa {tip['odds']['home']:.2f} | Empate {tip['odds']['draw']:.2f} | Fora {tip['odds']['away']:.2f}")
-                st.markdown("---")
-            
-            if not is_vip:
-                st.info("💡 Voce esta vendo apenas o Top 1. Faca upgrade para VIP e veja o Top 3 completo + Simulador de Banca!")
+                    odd_media = (tip['odds']['home'] + tip['odds']['draw'] + tip['odds']['away']) / 3
+                    st.metric("💰 Odd Média", f"{odd_media:.2f}")
 
-    elif menu == "📊 Transparencia & ROI":
-        st.title("📊 Auditoria e Transparencia do Modelo DRL")
-        st.markdown("Aqui voce ve o **historico real** da IA rodando sobre partidas passadas. Sem promessas, apenas matematica e backtesting.")
-        
-        if st.button("🔄 Rodar Backtesting (Historico CSV)", type="primary"):
-            with st.spinner("Processando historico e calculando metricas..."):
+                st.caption(
+                    f"📊 **Probabilidades IA:** "
+                    f"Casa {tip['probs']['home']:.1%} | "
+                    f"Empate {tip['probs']['draw']:.1%} | "
+                    f"Fora {tip['probs']['away']:.1%}"
+                )
+                st.caption(
+                    f"💵 **Odds de Mercado:** "
+                    f"Casa {tip['odds']['home']:.2f} | "
+                    f"Empate {tip['odds']['draw']:.2f} | "
+                    f"Fora {tip['odds']['away']:.2f}"
+                )
+                st.markdown("---")
+
+            if not is_vip:
+                st.info("💡 Está a ver apenas o Top 1. Faça upgrade VIP para ver Top 3 + Simulador de Banca!")
+
+    elif menu == "📊 Transparência & ROI":
+        st.title("📊 Auditoria e Transparência do Modelo DRL")
+        st.markdown("**Histórico real** da IA sobre partidas passadas. Apenas matemática e backtesting.")
+
+        if st.button("🔄 Rodar Backtesting", type="primary"):
+            with st.spinner("Processando histórico..."):
                 try:
                     resp = api_request_with_retry("GET", f"{API_URL}/backtest", timeout=60)
                     if resp.status_code == 200:
@@ -191,14 +199,14 @@ def dashboard():
                     else:
                         st.error("Erro ao buscar backtest.")
                 except Exception as e:
-                    st.error(f"Erro de conexao: {e}")
-        
+                    st.error(f"Erro de conexão: {e}")
+
         if 'backtest' in st.session_state:
             bt = st.session_state['backtest']
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("💰 ROI Total", bt['roi'])
-                st.metric("🎯 Acuracia", bt['accuracy'])
+                st.metric("🎯 Acurácia", bt['accuracy'])
             with c2:
                 st.metric("📉 Max Drawdown", bt['max_drawdown'])
                 st.metric("📊 Brier Score", bt['brier_score'])
@@ -207,20 +215,29 @@ def dashboard():
                 st.metric("🔢 Log-Loss", bt['log_loss'])
             with c4:
                 st.metric("💵 Banca Final", f"R$ {bt['final_bank']}")
-                st.metric("🎲 Total de Apostas", bt['total_bets'])
-            
+                st.metric("🎲 Total Apostas", bt['total_bets'])
+
             st.markdown("---")
             st.subheader("📈 Curva de Capital (Equity Curve)")
             fig = go.Figure()
-            fig.add_trace(go.Scatter(y=bt['equity_curve'], mode='lines', name='Banca (R$)', fill='tozeroy', line=dict(color='#1f77b4', width=3)))
-            fig.update_layout(xaxis_title="Sequencia de Partidas", yaxis_title="Banca (R$)", height=400, template="plotly_dark")
+            fig.add_trace(go.Scatter(
+                y=bt['equity_curve'], mode='lines',
+                name='Banca (R$)', fill='tozeroy',
+                line=dict(color='#1f77b4', width=3)
+            ))
+            fig.update_layout(
+                xaxis_title="Sequência de Partidas",
+                yaxis_title="Banca (R$)",
+                height=400,
+                template="plotly_dark"
+            )
             st.plotly_chart(fig, use_container_width=True)
-            
-            if not is_vip:
-                st.success("🔥 **Gostou dos resultados?** Faca upgrade para o plano VIP agora!")
 
-    elif menu == "🔮 Analise Manual":
-        st.title("🔮 Analise Manual")
+            if not is_vip:
+                st.success("🔥 **Gostou dos resultados?** Faça upgrade para o plano VIP!")
+
+    elif menu == "🔮 Análise Manual":
+        st.title("🔮 Análise Manual")
         if st.button("Carregar MUR vs LDU"):
             st.session_state['match_data'] = {
                 "date": "2026-05-12", "home_team": "Mushuc Runa", "away_team": "LDU Quito",
@@ -234,9 +251,10 @@ def dashboard():
                 "touches_box_home": 13, "touches_box_away": 12, "rest_days_home": 7, "rest_days_away": 7,
                 "altitude_home_m": 2577, "home_league_pos": 9, "away_league_pos": 11,
                 "home_pts": 16, "away_pts": 17, "home_gf_season": 15, "home_ga_season": 13,
-                "away_gf_season": 10, "away_ga_season": 13, "odds_home": 2.75, "odds_draw": 3.25, "odds_away": 2.60
+                "away_gf_season": 10, "away_ga_season": 13,
+                "odds_home": 2.75, "odds_draw": 3.25, "odds_away": 2.60
             }
-        
+
         if 'match_data' in st.session_state:
             if st.button("Executar DRL", type="primary"):
                 try:
@@ -245,25 +263,30 @@ def dashboard():
                         st.session_state['result'] = resp.json()
                 except Exception as e:
                     st.error(f"Erro: {e}")
-            
+
             if 'result' in st.session_state:
                 r = st.session_state['result']
-                st.metric("Acao", r['recommendation'])
-                st.metric("CLV Casa", f"{r['clv']['home']:+.2%}")
+                st.metric("🎯 Ação", r['recommendation'])
+                st.metric("📈 CLV Casa", f"{r['clv']['home']:+.2%}")
 
     elif menu == "💰 Simulador de Banca":
         st.title("💰 Simulador de Banca (Kelly 1/4)")
         if 'result' not in st.session_state:
-            st.warning("Rode uma analise manual primeiro.")
+            st.warning("Execute uma análise manual primeiro.")
         else:
             r = st.session_state['result']
-            bank = st.slider("Banca (R$)", 100, 50000, 1000, 100)
+            bank = st.slider("Banca (€)", 100, 50000, 1000, 100)
             rec = r['recommendation']
-            kf = r['kelly'].get('home', 0) if rec == "BET_HOME" else (r['kelly'].get('draw', 0) if rec == "BET_DRAW" else r['kelly'].get('away', 0))
-            st.metric("Aposta Sugerida", f"R$ {bank * kf:.2f}")
+            if rec == "BET_HOME":
+                kf = r['kelly'].get('home', 0)
+            elif rec == "BET_DRAW":
+                kf = r['kelly'].get('draw', 0)
+            else:
+                kf = r['kelly'].get('away', 0)
+            st.metric("💶 Aposta Sugerida", f"€ {bank * kf:.2f}")
 
-    elif menu == "📜 Historico":
-        st.title("📜 Historico")
+    elif menu == "📜 Histórico":
+        st.title("📜 Histórico de Previsões")
         if st.button("Atualizar"):
             try:
                 resp = api_request_with_retry("GET", f"{API_URL}/history?limit=10")
@@ -271,11 +294,13 @@ def dashboard():
                     data = resp.json()
                     if data:
                         df = pd.DataFrame(data)
-                        st.dataframe(df[['teams', 'recommendation', 'confidence', 'created_at']], use_container_width=True, hide_index=True)
+                        cols = [c for c in ['teams', 'recommendation', 'confidence', 'created_at'] if c in df.columns]
+                        st.dataframe(df[cols], use_container_width=True, hide_index=True)
                     else:
-                        st.info("Sem historico.")
+                        st.info("Sem histórico.")
             except Exception as e:
                 st.error(f"Erro: {e}")
+
 
 if not st.session_state.get('logged_in', False):
     login_page()
