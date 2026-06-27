@@ -9,7 +9,7 @@ st.set_page_config(page_title="DRL Football AI v44", page_icon="🧠", layout="w
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 def api_request_with_retry(method, url, **kwargs):
-    """Faz requisição com retry para lidar com servidor "dormindo" no Render"""
+    """Faz requisição com retry para lidar com servidor 'dormindo' no Render"""
     timeout = kwargs.pop('timeout', 30)
     for attempt in range(3):
         try:
@@ -123,24 +123,33 @@ def dashboard():
                 st.write(f"Analisando {len(fixtures)} jogos...")
                 
                 for i, fix in enumerate(fixtures):
-                    st.write(f"  {fix['home_team']} vs {fix['away_team']} ({i+1}/{len(fixtures)})")
+                    # Suporta tanto chaves 'home_team' (API real) quanto 'home' (mock)
+                    home = fix.get('home_team', fix.get('home', 'Unknown'))
+                    away = fix.get('away_team', fix.get('away', 'Unknown'))
+                    st.write(f"  ⚽ {home} vs {away} ({i+1}/{len(fixtures)})")
+                    
                     features = estimate_prematch_features(fix)
                     try:
                         resp = api_request_with_retry("POST", f"{API_URL}/predict", json=features)
                         if resp.status_code == 200:
                             res = resp.json()
                             tips.append({
-                                "match": f"{fix['home_team']} vs {fix['away_team']}",
+                                "match": f"{home} vs {away}",
+                                "league": fix.get('competition', fix.get('league', 'Unknown')),
                                 "rec": res["recommendation"],
                                 "conf": res["confidence"],
                                 "probs": res["probs"],
                                 "kelly": res["kelly"],
                                 "clv": res["clv"],
                                 "max_clv": max(res["clv"].values()),
-                                "odds": {"home": features["odds_home"], "draw": features["odds_draw"], "away": features["odds_away"]}
+                                "odds": {
+                                    "home": features.get("odds_home", 2.5),
+                                    "draw": features.get("odds_draw", 3.2),
+                                    "away": features.get("odds_away", 2.8)
+                                }
                             })
                     except Exception as e:
-                        st.error(f"Erro ao processar {fix['home_team']}: {e}")
+                        st.error(f"Erro ao processar {home}: {e}")
                 
                 status.update(label="Concluido!", state="complete", expanded=False)
                 st.session_state['tips'] = sorted(tips, key=lambda x: x["max_clv"], reverse=True)[:limit]
@@ -148,14 +157,22 @@ def dashboard():
         if 'tips' in st.session_state:
             for i, tip in enumerate(st.session_state['tips']):
                 st.markdown(f"### {i+1}. {tip['match']}")
-                c1, c2, c3 = st.columns(3)
+                
+                if 'league' in tip:
+                    st.caption(f"🏆 {tip['league']}")
+                
+                c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     st.metric("Acao", tip['rec'])
-                    st.caption(f"Casa: {tip['probs']['home']:.1%} | Emp: {tip['probs']['draw']:.1%} | Fora: {tip['probs']['away']:.1%}")
                 with c2:
                     st.metric("Edge (CLV)", f"{tip['max_clv']:+.2%}")
                 with c3:
                     st.metric("Confianca", tip['conf'])
+                with c4:
+                    st.metric("Odd Media", f"{(tip['odds']['home'] + tip['odds']['draw'] + tip['odds']['away']) / 3:.2f}")
+                
+                st.caption(f"Probabilidades: Casa {tip['probs']['home']:.1%} | Empate {tip['probs']['draw']:.1%} | Fora {tip['probs']['away']:.1%}")
+                st.caption(f"Odds de Mercado: Casa {tip['odds']['home']:.2f} | Empate {tip['odds']['draw']:.2f} | Fora {tip['odds']['away']:.2f}")
                 st.markdown("---")
             
             if not is_vip:
