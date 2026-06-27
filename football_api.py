@@ -10,9 +10,7 @@ load_dotenv()
 API_KEY = os.environ.get("FOOTBALL_API_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 
-print(f"[DEBUG] API_KEY configurada: {'SIM' if API_KEY else 'NÃO'}")
-print(f"[DEBUG] API_KEY length: {len(API_KEY) if API_KEY else 0}")
-
+# Cache simples
 _cache = {}
 _cache_timestamps = {}
 CACHE_DURATION = 300
@@ -25,33 +23,25 @@ def _get_with_cache(endpoint: str, params: dict = None) -> dict:
             return _cache[cache_key]
     
     headers = {"x-apisports-key": API_KEY}
-    print(f"[DEBUG] Fazendo requisição para: {endpoint}")
+    print(f"[DEBUG] Requisitando: {endpoint}")
     
-    try:
-        response = requests.get(f"{BASE_URL}/{endpoint}", headers=headers, params=params, timeout=10)
-        print(f"[DEBUG] Status code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            _cache[cache_key] = data
-            _cache_timestamps[cache_key] = time.time()
-            return data
-        else:
-            print(f"[ERRO] API Error: {response.status_code} - {response.text}")
-            raise Exception(f"API Error: {response.status_code}")
-    except Exception as e:
-        print(f"[ERRO] Exceção na requisição: {str(e)}")
-        raise
+    response = requests.get(f"{BASE_URL}/{endpoint}", headers=headers, params=params, timeout=10)
+    print(f"[DEBUG] Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        _cache[cache_key] = data
+        _cache_timestamps[cache_key] = time.time()
+        return data
+    else:
+        raise Exception(f"API Error: {response.status_code} - {response.text}")
 
 def get_fixtures_by_date(date: str = None) -> List[Dict]:
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
     params = {"date": date}
-    print(f"[DEBUG] Buscando jogos para data: {date}")
     data = _get_with_cache("fixtures", params)
-    response = data.get("response", [])
-    print(f"[DEBUG] Jogos encontrados: {len(response)}")
-    return response
+    return data.get("response", [])
 
 def get_fixture_statistics(fixture_id: int) -> Dict:
     params = {"fixture": fixture_id}
@@ -87,7 +77,8 @@ def get_fixture_odds(fixture_id: int) -> Dict:
     return {}
 
 def get_real_fixtures_for_today() -> List[Dict]:
-    print("[INFO] Iniciando get_real_fixtures_for_today()")
+    print("[INFO] get_real_fixtures_for_today() chamado")
+    print(f"[DEBUG] API_KEY configurada: {'SIM' if API_KEY else 'NÃO'}")
     
     if not API_KEY:
         print("[ERRO] FOOTBALL_API_KEY não configurada!")
@@ -95,23 +86,23 @@ def get_real_fixtures_for_today() -> List[Dict]:
     
     try:
         today = datetime.now().strftime("%Y-%m-%d")
-        print(f"[INFO] Buscando jogos reais para {today}...")
+        print(f"[INFO] Buscando jogos para {today}...")
         
         fixtures = get_fixtures_by_date(today)
+        print(f"[DEBUG] Total de jogos encontrados: {len(fixtures)}")
         
         valid_fixtures = [f for f in fixtures if f.get("fixture", {}).get("status", {}).get("short", "") in ["NS", "1H", "2H", "HT"]]
-        
-        print(f"[INFO] Jogos válidos encontrados: {len(valid_fixtures)}")
+        print(f"[DEBUG] Jogos válidos (não iniciados): {len(valid_fixtures)}")
         
         if len(valid_fixtures) == 0:
-            print("[AVISO] Nenhum jogo válido encontrado hoje")
+            print("[AVISO] Nenhum jogo válido hoje")
             return _get_mock_fixtures()
         
         results = []
         for fixture in valid_fixtures[:8]:
             try:
                 fid = fixture.get("fixture", {}).get("id")
-                print(f"[DEBUG] Processando jogo ID: {fid}")
+                print(f"[DEBUG] Processando jogo {fid}")
                 
                 stats = get_fixture_statistics(fid)
                 odds = get_fixture_odds(fid)
@@ -166,14 +157,14 @@ def get_real_fixtures_for_today() -> List[Dict]:
                 })
                 time.sleep(0.3)
             except Exception as e:
-                print(f"[ERRO] Erro ao processar jogo {fid}: {str(e)}")
+                print(f"[ERRO] Erro no jogo {fid}: {str(e)}")
                 continue
         
-        print(f"[INFO] Total de jogos processados com sucesso: {len(results)}")
+        print(f"[INFO] Jogos processados: {len(results)}")
         return results if results else _get_mock_fixtures()
         
     except Exception as e:
-        print(f"[ERRO CRÍTICO] Erro em get_real_fixtures_for_today: {str(e)}")
+        print(f"[ERRO CRÍTICO] {str(e)}")
         return _get_mock_fixtures()
 
 def _get_mock_fixtures() -> List[Dict]:

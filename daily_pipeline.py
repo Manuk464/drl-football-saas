@@ -10,21 +10,21 @@ def get_today_fixtures():
     print("[INFO] get_today_fixtures() chamado")
     api_key = os.environ.get("FOOTBALL_API_KEY", "")
     
-    print(f"[DEBUG] API_KEY no daily_pipeline: {'CONFIGURADA' if api_key else 'NÃO CONFIGURADA'}")
+    print(f"[DEBUG] API_KEY: {'CONFIGURADA' if api_key else 'NÃO CONFIGURADA'}")
     
     if api_key:
         try:
-            print("[INFO] Tentando buscar jogos reais...")
+            print("[INFO] Buscando jogos reais...")
             real_fixtures = get_real_fixtures_for_today()
             if real_fixtures:
-                print(f"[SUCCESS] {len(real_fixtures)} jogos reais encontrados!")
+                print(f"[SUCCESS] {len(real_fixtures)} jogos reais!")
                 return real_fixtures
             else:
-                print("[AVISO] Nenhum jogo real retornado")
+                print("[AVISO] Nenhum jogo real")
         except Exception as e:
-            print(f"[ERRO] Falha ao buscar jogos reais: {str(e)}")
+            print(f"[ERRO] Falha: {str(e)}")
     
-    print("[INFO] Usando dados simulados como fallback")
+    print("[INFO] Usando fallback")
     today = datetime.now().strftime("%Y-%m-%d")
     fixtures = [
         {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8},
@@ -131,7 +131,7 @@ def generate_daily_tips():
                     }
                 })
         except Exception as e:
-            print(f"Erro ao processar {fix}: {e}")
+            print(f"Erro: {e}")
     
     tips.sort(key=lambda x: x["max_clv"], reverse=True)
     return tips
