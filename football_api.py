@@ -30,59 +30,52 @@ def _get(endpoint, params=None):
     return {"response": []}
 
 def extract_stat(stats, stat_name):
-    if not stats: return 0.0
+    if not stats:
+        return 0.0
     for s in stats:
         if s.get("type") == stat_name:
             v = s.get("value")
-            if v is None or v == "": return 0.0
+            if v is None or v == "":
+                return 0.0
             if isinstance(v, str):
                 v = v.replace("%", "").replace(",", ".").strip()
-                try: return float(v)
-                except: return 0.0
-            try: return float(v)
-            except: return 0.0
+                try:
+                    return float(v)
+                except:
+                    return 0.0
+            try:
+                return float(v)
+            except:
+                return 0.0
     return 0.0
 
-def get_fixtures_by_date(date=None):
-    if date is None: date = datetime.now().strftime("%Y-%m-%d")
-    data = _get("fixtures", {"date": date})
-    return data.get("response", [])
-
-def get_fixture_statistics(fixture_id):
-    data = _get("fixtures/statistics", {"fixture": fixture_id})
-    stats = data.get("response", [])
-    if len(stats) >= 2:
-        return {"home": stats[0].get("statistics", []), "away": stats[1].get("statistics", [])}
-    return {"home": [], "away": []}
-
-def get_fixture_odds(fixture_id):
-    data = _get("odds", {"fixture": fixture_id})
-    odds_data = data.get("response", [])
-    odds = {"home": 2.5, "draw": 3.2, "away": 2.8}
-    if odds_data:
-        for bm in odds_data[0].get("bookmakers", []):
-            for bet in bm.get("bets", []):
-                if bet.get("name") == "Match Winner":
-                    for val in bet.get("values", []):
-                        if val.get("value") == "Home": odds["home"] = float(val.get("odd", 2.5))
-                        elif val.get("value") == "Draw": odds["draw"] = float(val.get("odd", 3.2))
-                        elif val.get("value") == "Away": odds["away"] = float(val.get("odd", 2.8))
-                    return odds
-    return odds
-
 def get_real_fixtures_for_today():
+    print("[INFO] Buscando jogos reais...")
     today = datetime.now().strftime("%Y-%m-%d")
-    fixtures = get_fixtures_by_date(today)
+    data = _get("fixtures", {"date": today})
+    fixtures = data.get("response", [])
     valid = [f for f in fixtures if f.get("fixture", {}).get("status", {}).get("short", "") in ["NS", "1H", "2H", "HT", "P"]]
     results = []
     for fixture in valid[:3]:
         try:
             fid = fixture.get("fixture", {}).get("id")
-            stats = get_fixture_statistics(fid)
-            home_stats = stats.get("home", [])
-            away_stats = stats.get("away", [])
+            stats_data = _get("fixtures/statistics", {"fixture": fid}).get("response", [])
+            home_stats = stats_data[0].get("statistics", []) if len(stats_data) > 0 else []
+            away_stats = stats_data[1].get("statistics", []) if len(stats_data) > 1 else []
             time.sleep(2)
-            odds = get_fixture_odds(fid)
+            odds_data = _get("odds", {"fixture": fid}).get("response", [])
+            odds = {"home": 2.5, "draw": 3.2, "away": 2.8}
+            if odds_data:
+                for bm in odds_data[0].get("bookmakers", []):
+                    for bet in bm.get("bets", []):
+                        if bet.get("name") == "Match Winner":
+                            for val in bet.get("values", []):
+                                if val.get("value") == "Home":
+                                    odds["home"] = float(val.get("odd", 2.5))
+                                elif val.get("value") == "Draw":
+                                    odds["draw"] = float(val.get("odd", 3.2))
+                                elif val.get("value") == "Away":
+                                    odds["away"] = float(val.get("odd", 2.8))
             time.sleep(2)
             teams = fixture.get("fixture", {}).get("teams", {})
             league = fixture.get("league", {})
@@ -90,11 +83,16 @@ def get_real_fixtures_for_today():
             away_name = teams.get("away", {}).get("name", "Unknown")
             league_name = league.get("name", "Unknown")
             round_str = league.get("round", "")
-            try: matchday = int("".join(filter(str.isdigit, round_str)) or 15)
-            except: matchday = 15
+            try:
+                matchday = int("".join(filter(str.isdigit, round_str)) or 15)
+            except:
+                matchday = 15
             results.append({
                 "date": fixture.get("fixture", {}).get("date", "")[:10],
-                "home_team": home_name, "away_team": away_name, "competition": league_name, "matchday": matchday,
+                "home_team": home_name,
+                "away_team": away_name,
+                "competition": league_name,
+                "matchday": matchday,
                 "xg_home": extract_stat(home_stats, "Expected Goals") or 1.2,
                 "xg_away": extract_stat(away_stats, "Expected Goals") or 1.0,
                 "shots_home": int(extract_stat(home_stats, "Total Shots") or 12),
@@ -109,7 +107,8 @@ def get_real_fixtures_for_today():
                 "tackles_away": int(extract_stat(away_stats, "Tackles") or 17),
                 "interceptions_home": int(extract_stat(home_stats, "Interceptions") or 10),
                 "interceptions_away": int(extract_stat(away_stats, "Interceptions") or 10),
-                "ppda_home": 9.0, "ppda_away": 9.0,
+                "ppda_home": 9.0,
+                "ppda_away": 9.0,
                 "corners_home": int(extract_stat(home_stats, "Corner Kicks") or 6),
                 "corners_away": int(extract_stat(away_stats, "Corner Kicks") or 5),
                 "aerial_won_home": extract_stat(home_stats, "Aerial Duels Won") or 50,
@@ -120,13 +119,24 @@ def get_real_fixtures_for_today():
                 "prog_passes_away": int((extract_stat(away_stats, "Total Passes") or 380) * 0.06),
                 "touches_box_home": int(extract_stat(home_stats, "Shots Inside Box") or 12),
                 "touches_box_away": int(extract_stat(away_stats, "Shots Inside Box") or 10),
-                "rest_days_home": 7, "rest_days_away": 7, "altitude_home_m": 0,
-                "home_league_pos": 10, "away_league_pos": 10, "home_pts": 20, "away_pts": 20,
-                "home_gf_season": 15, "home_ga_season": 15, "away_gf_season": 15, "away_ga_season": 15,
-                "odds_home": odds.get("home", 2.5), "odds_draw": odds.get("draw", 3.2), "odds_away": odds.get("away", 2.8)
+                "rest_days_home": 7,
+                "rest_days_away": 7,
+                "altitude_home_m": 0,
+                "home_league_pos": 10,
+                "away_league_pos": 10,
+                "home_pts": 20,
+                "away_pts": 20,
+                "home_gf_season": 15,
+                "home_ga_season": 15,
+                "away_gf_season": 15,
+                "away_ga_season": 15,
+                "odds_home": odds.get("home", 2.5),
+                "odds_draw": odds.get("draw", 3.2),
+                "odds_away": odds.get("away", 2.8)
             })
+            print(f"[OK] {home_name} vs {away_name}")
         except Exception as e:
-            print(f"Erro no jogo: {e}")
+            print(f"[ERRO] {e}")
             continue
     return results
 
@@ -135,5 +145,4 @@ def _get_mock_fixtures():
     return [
         {"home_team": "Mushuc Runa", "away_team": "LDU Quito", "competition": "Liga Pro", "home_str": 0.6, "away_str": 0.8, "date": today},
         {"home_team": "Barcelona SC", "away_team": "Emelec", "competition": "Liga Pro", "home_str": 0.85, "away_str": 0.65, "date": today},
-        {"home_team": "Ind. del Valle", "away_team": "Aucas", "competition": "Liga Pro", "home_str": 0.9, "away_str": 0.5, "date": today},
     ]
