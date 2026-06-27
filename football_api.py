@@ -4,11 +4,51 @@ from datetime import datetime
 from typing import List, Dict
 import time
 
-API_KEY = os.environ.get("FOOTBALL_API_KEY", "")
-BASE_URL = "https://v3.football.api-sports.io"
+# ============================================================================
+# DEBUG: Ver todas as variáveis de ambiente disponíveis
+# ============================================================================
+print("=" * 60)
+print("🔍 DEBUG - VARIÁVEIS DE AMBIENTE DISPONÍVEIS:")
+print("=" * 60)
+for key in sorted(os.environ.keys()):
+    if 'API' in key.upper() or 'KEY' in key.upper() or 'FOOTBALL' in key.upper():
+        value = os.environ[key]
+        if len(value) > 10:
+            value = value[:10] + "..."
+        print(f"  {key} = {value}")
+print("=" * 60)
 
-print(f"[DEBUG] API_KEY length: {len(API_KEY)}")
-print(f"[DEBUG] API_KEY configurada: {'SIM' if API_KEY else 'NÃO'}")
+# ============================================================================
+# TENTA LER A API KEY DE 3 FONTES DIFERENTES
+# ============================================================================
+API_KEY = None
+
+# Fonte 1: os.environ (Render)
+if "FOOTBALL_API_KEY" in os.environ:
+    API_KEY = os.environ["FOOTBALL_API_KEY"]
+    print(f"✅ API_KEY lida de os.environ (length: {len(API_KEY)})")
+
+# Fonte 2: st.secrets (Streamlit Cloud)
+if not API_KEY:
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'FOOTBALL_API_KEY' in st.secrets:
+            API_KEY = st.secrets['FOOTBALL_API_KEY']
+            print(f"✅ API_KEY lida de st.secrets (length: {len(API_KEY)})")
+    except:
+        print("⚠️ st.secrets não disponível")
+
+# Fonte 3: HARDCODE TEMPORÁRIO (APENAS PARA TESTE - REMOVER DEPOIS!)
+if not API_KEY:
+    API_KEY = "28ea505ca8e0fac5bb6d064589244bfc"
+    print(f"⚠️ API_KEY usando valor hardcoded temporário (length: {len(API_KEY)})")
+    print("⚠️ REMOVA ISSO APÓS RESOLVER AS SECRETS DO STREAMLIT!")
+
+print(f"📊 API_KEY final length: {len(API_KEY) if API_KEY else 0}")
+print(f"📊 API_KEY configurada: {'SIM' if API_KEY else 'NÃO'}")
+print("=" * 60)
+
+BASE_URL = "https://v3.football.api-sports.io"
 
 _cache = {}
 _cache_ts = {}
@@ -30,6 +70,7 @@ def _get(endpoint, params=None):
         _cache_ts[key] = time.time()
         return _cache[key]
     else:
+        print(f"[ERRO] API Error: {r.status_code} - {r.text[:200]}")
         raise Exception(f"API Error: {r.status_code}")
 
 def get_fixtures_by_date(date=None):
