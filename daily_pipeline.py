@@ -22,7 +22,7 @@ def get_today_fixtures():
             else:
                 print("[AVISO] Nenhum jogo real")
         except Exception as e:
-            print(f"[ERRO] Falha: {str(e)}")
+            print(f"[ERRO] Falha: {e}")
     
     print("[INFO] Usando fallback")
     today = datetime.now().strftime("%Y-%m-%d")
@@ -37,7 +37,7 @@ def get_today_fixtures():
     
     return fixtures
 
-def estimate_prematch_features(fixture: dict) -> dict:
+def estimate_prematch_features(fixture):
     if "xg_home" in fixture and "odds_home" in fixture:
         return fixture
     
